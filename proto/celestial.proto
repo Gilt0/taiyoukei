@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package taiyoukei;
+
+option go_package = "./proto";
+
+message CelestialBody {
+    uint64 sequence = 1; // Seqwuence in stream
+    string name     = 2; // Name of the celestial body
+    double mass     = 3; // Mass of the celestial body
+    double x        = 4; // Initial x-position
+    double y        = 5; // Initial y-position
+    double vx       = 6; // Initial x-speed
+    double vy       = 7; // Initial x-speed
+}
+
+service CelestialService {
+    rpc CelestialUpdate(stream CelestialBody) returns (stream Data) {}
+}
+
+message Data {
+    bool success = 1;
+    map<string, CelestialBody> content = 2;
+}
