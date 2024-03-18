@@ -14,8 +14,11 @@ message CelestialBody {
     double vy       = 7; // Initial x-speed
 }
 
+message CelestialBodiesPositionRequest {}
+
 service CelestialService {
     rpc CelestialUpdate(stream CelestialBody) returns (stream Data) {}
+    rpc CelestialBodiesPositions(CelestialBodiesPositionRequest) returns (stream Data) {}
 }
 
 message Data {

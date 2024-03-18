@@ -5,7 +5,6 @@ import (
 	"flag"
 	"log"
 	"math"
-	"time"
 
 	pb "taiyoukei/proto"
 
@@ -205,7 +204,7 @@ func (c *celestialConnection) run() error {
 		log.Printf("Received broadcast update %v\n", broadcast)
 
 		// Increment values
-		c.udpateData(broadcast, 0.01)
+		c.udpateData(broadcast, 0.000001)
 
 		// Send updated values
 		err = c.sendUpdate()
@@ -216,7 +215,7 @@ func (c *celestialConnection) run() error {
 		}
 		log.Printf("Sending update %v\n", &c.data)
 
-		time.Sleep(1000000000)
+		// time.Sleep(1000)
 
 	}
 
@@ -302,8 +301,11 @@ func (fh *celestialRateFunctionHandler) evaluate(sigmai hamiltonVector) hamilton
 	for j, sigmaj := range fh.bodies {
 		muj := fh.masses[j]
 		d_ij := math.Sqrt((sigmaj.x-sigmai.x)*(sigmaj.x-sigmai.x) + (sigmaj.y-sigmai.y)*(sigmaj.y-sigmai.y))
-		rate.vx += muj * (sigmaj.x - sigmai.x) / (d_ij * d_ij * d_ij)
-		rate.vy += muj * (sigmaj.y - sigmai.y) / (d_ij * d_ij * d_ij)
+		Fx := muj * (sigmaj.x - sigmai.x) / (d_ij * d_ij * d_ij)
+		Fy := muj * (sigmaj.y - sigmai.y) / (d_ij * d_ij * d_ij)
+		rate.vx += Fx
+		rate.vy += Fy
+		log.Printf("mu = %v d = %v, F = %v", muj, d_ij, math.Sqrt(Fx*Fx+Fy*Fy))
 	}
 	return rate
 }

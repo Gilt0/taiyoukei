@@ -2,12 +2,16 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"log"
+	"math"
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	pb "taiyoukei/proto"
+	// protoc --go_out=. --go-grpc_out=. --proto_path=proto/ proto/celestial.proto
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -17,6 +21,17 @@ const EMPTY_STR = ""
 const UNDEFINED = "<undefined>"
 const ZERO = 0
 const ONE = 1
+
+type argParser struct {
+	port int
+	n    int
+}
+
+func (parser *argParser) parse() {
+	flag.IntVar(&parser.port, "server", 50051, "The port to use (in integer format)")
+	flag.IntVar(&parser.n, "n", 3, "Number of Orbiting bodies: routine won't start unless that number is equal to the number of connections")
+	flag.Parse()
+}
 
 type lightCelestialBody struct {
 	sequence uint64
@@ -75,6 +90,8 @@ type server struct {
 	pb.UnimplementedCelestialServiceServer
 	mutex       sync.Mutex
 	connections map[uuid.UUID]*connection
+	archive     pb.Data
+	n           int
 }
 
 func (s *server) isReadyForBroadcast() bool {
@@ -86,8 +103,17 @@ func (s *server) isReadyForBroadcast() bool {
 	return true
 }
 
-func (s *server) prepareBroadcastData(data *pb.Data) {
+func (s *server) prepareBroadcastData(data *pb.Data) error {
 	for _, c := range s.connections {
+		if math.IsNaN(c.data.x) {
+			return errors.New("x is nan")
+		} else if math.IsNaN(c.data.y) {
+			return errors.New("y is nan")
+		} else if math.IsNaN(c.data.vx) {
+			return errors.New("vx is nan")
+		} else if math.IsNaN(c.data.vy) {
+			return errors.New("vy is nan")
+		}
 		data.Content[c.data.name] = &pb.CelestialBody{
 			Sequence: c.data.sequence,
 			Name:     c.data.name,
@@ -98,6 +124,24 @@ func (s *server) prepareBroadcastData(data *pb.Data) {
 			Vy:       c.data.vy,
 		}
 	}
+	return nil
+}
+
+func (s *server) archiveBroadcastData(data *pb.Data) {
+	s.mutex.Lock()
+	s.archive.Success = data.Success
+	for name, datum := range data.Content {
+		s.archive.Content[name] = &pb.CelestialBody{
+			Sequence: datum.Sequence,
+			Name:     datum.Name,
+			Mass:     datum.Mass,
+			X:        datum.X,
+			Y:        datum.Y,
+			Vx:       datum.Vx,
+			Vy:       datum.Vy,
+		}
+	}
+	s.mutex.Unlock()
 }
 
 func (s *server) resetConnectionsData() {
@@ -138,6 +182,8 @@ func (s *server) CelestialUpdate(stream pb.CelestialService_CelestialUpdateServe
 	n_connections := len(s.connections)
 	s.mutex.Unlock()
 
+	stop := make(chan bool)
+
 	if n_connections == ONE {
 		go func() {
 			for {
@@ -157,12 +203,18 @@ func (s *server) CelestialUpdate(stream pb.CelestialService_CelestialUpdateServe
 					Success: true,
 					Content: make(map[string]*pb.CelestialBody),
 				}
-				s.prepareBroadcastData(&data)
+				if err := s.prepareBroadcastData(&data); err != nil {
+					stop <- true
+					break
+				}
+				// Keep an archive for frontend cilent through method CelestialBodiesPositions
+				s.archiveBroadcastData(&data)
 				// Resetting connection's data first to ensure that data acquisition
 				// from clients can immediately resume
 				s.resetConnectionsData()
 				err := s.sendData(&data)
 				if err != nil {
+					stop <- true
 					break
 				}
 			}
@@ -170,24 +222,64 @@ func (s *server) CelestialUpdate(stream pb.CelestialService_CelestialUpdateServe
 	}
 
 	log.Printf("Initiating data reception for id %v", id)
+forloop:
 	for {
-		data, err := stream.Recv()
-		if err != nil {
-			name := c.getName()
-			log.Printf("Could not receive data stream from %v", name)
+		select {
+		case <-stop:
+			break forloop
+		default:
+			data, err := stream.Recv()
+			if err != nil {
+				name := c.getName()
+				log.Printf("Could not receive data stream from %v", name)
+				s.mutex.Lock()
+				delete(s.connections, id)
+				s.mutex.Unlock()
+				return err
+			}
 			s.mutex.Lock()
-			delete(s.connections, id)
+			c.setName(data.Name)
+			c.setData(data)
+			log.Printf("Received data from %v: %v", c.name, c.data)
 			s.mutex.Unlock()
-			return err
+
+			for {
+				if len(s.connections) == s.n {
+					break
+				}
+			}
 		}
-		c.setName(data.Name)
-		c.setData(data)
-		log.Printf("Received data from %v: %v", c.name, c.data)
+	}
+	return nil
+}
+
+func (s *server) CelestialBodiesPositions(req *pb.CelestialBodiesPositionRequest, stream pb.CelestialService_CelestialBodiesPositionsServer) error {
+	log.Printf("Received CelestialBodiesPositions call")
+
+	// Example of sending the latest data periodically
+	// You can adjust this logic based on how your data is generated or stored
+	ticker := time.NewTicker(time.Millisecond * 10)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.mutex.Lock()
+			if err := stream.Send(&s.archive); err != nil {
+				log.Printf("Failed to send data: %v", err)
+				s.mutex.Unlock()
+				return err
+			}
+			s.mutex.Unlock()
+		}
 	}
 }
 
 func main() {
-	port := 50051
+	parser := argParser{}
+	parser.parse()
+	port := parser.port
+	n := parser.n
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		log.Fatalf("Failed to start listener on port %v", port)
@@ -195,6 +287,11 @@ func main() {
 	s := grpc.NewServer()
 	pb.RegisterCelestialServiceServer(s, &server{
 		connections: make(map[uuid.UUID]*connection),
+		archive: pb.Data{
+			Success: false,
+			Content: make(map[string]*pb.CelestialBody),
+		},
+		n: n,
 	})
 	log.Printf("CelestialService started on port %v", port)
 	if err = s.Serve(lis); err != nil {

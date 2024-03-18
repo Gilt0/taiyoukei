@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	CelestialService_CelestialUpdate_FullMethodName = "/taiyoukei.CelestialService/CelestialUpdate"
+	CelestialService_CelestialUpdate_FullMethodName          = "/taiyoukei.CelestialService/CelestialUpdate"
+	CelestialService_CelestialBodiesPositions_FullMethodName = "/taiyoukei.CelestialService/CelestialBodiesPositions"
 )
 
 // CelestialServiceClient is the client API for CelestialService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CelestialServiceClient interface {
 	CelestialUpdate(ctx context.Context, opts ...grpc.CallOption) (CelestialService_CelestialUpdateClient, error)
+	CelestialBodiesPositions(ctx context.Context, in *CelestialBodiesPositionRequest, opts ...grpc.CallOption) (CelestialService_CelestialBodiesPositionsClient, error)
 }
 
 type celestialServiceClient struct {
@@ -68,11 +70,44 @@ func (x *celestialServiceCelestialUpdateClient) Recv() (*Data, error) {
 	return m, nil
 }
 
+func (c *celestialServiceClient) CelestialBodiesPositions(ctx context.Context, in *CelestialBodiesPositionRequest, opts ...grpc.CallOption) (CelestialService_CelestialBodiesPositionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CelestialService_ServiceDesc.Streams[1], CelestialService_CelestialBodiesPositions_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &celestialServiceCelestialBodiesPositionsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CelestialService_CelestialBodiesPositionsClient interface {
+	Recv() (*Data, error)
+	grpc.ClientStream
+}
+
+type celestialServiceCelestialBodiesPositionsClient struct {
+	grpc.ClientStream
+}
+
+func (x *celestialServiceCelestialBodiesPositionsClient) Recv() (*Data, error) {
+	m := new(Data)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // CelestialServiceServer is the server API for CelestialService service.
 // All implementations must embed UnimplementedCelestialServiceServer
 // for forward compatibility
 type CelestialServiceServer interface {
 	CelestialUpdate(CelestialService_CelestialUpdateServer) error
+	CelestialBodiesPositions(*CelestialBodiesPositionRequest, CelestialService_CelestialBodiesPositionsServer) error
 	mustEmbedUnimplementedCelestialServiceServer()
 }
 
@@ -82,6 +117,9 @@ type UnimplementedCelestialServiceServer struct {
 
 func (UnimplementedCelestialServiceServer) CelestialUpdate(CelestialService_CelestialUpdateServer) error {
 	return status.Errorf(codes.Unimplemented, "method CelestialUpdate not implemented")
+}
+func (UnimplementedCelestialServiceServer) CelestialBodiesPositions(*CelestialBodiesPositionRequest, CelestialService_CelestialBodiesPositionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method CelestialBodiesPositions not implemented")
 }
 func (UnimplementedCelestialServiceServer) mustEmbedUnimplementedCelestialServiceServer() {}
 
@@ -122,6 +160,27 @@ func (x *celestialServiceCelestialUpdateServer) Recv() (*CelestialBody, error) {
 	return m, nil
 }
 
+func _CelestialService_CelestialBodiesPositions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(CelestialBodiesPositionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CelestialServiceServer).CelestialBodiesPositions(m, &celestialServiceCelestialBodiesPositionsServer{stream})
+}
+
+type CelestialService_CelestialBodiesPositionsServer interface {
+	Send(*Data) error
+	grpc.ServerStream
+}
+
+type celestialServiceCelestialBodiesPositionsServer struct {
+	grpc.ServerStream
+}
+
+func (x *celestialServiceCelestialBodiesPositionsServer) Send(m *Data) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // CelestialService_ServiceDesc is the grpc.ServiceDesc for CelestialService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -135,6 +194,11 @@ var CelestialService_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _CelestialService_CelestialUpdate_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "CelestialBodiesPositions",
+			Handler:       _CelestialService_CelestialBodiesPositions_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "celestial.proto",
