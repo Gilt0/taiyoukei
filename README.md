@@ -1,5 +1,5 @@
 # taiyoukei
-Planetary system with gRPC
+Planetary system with gRPC.
 
 
 From the root, in that order
@@ -27,3 +27,9 @@ go run client/run.go -name M -mass 0.000000036938 -x 0.997427 -y 0 -vx 0 -vy 0.9
 The graphical outputs from the capture client are generated on a regular basis and when SIGTERM'd. 
 
 To stop the processes, first terminate the capture, then you can simply terminate the server, it will automatically terminate the clients.
+
+Expected plotting outputs should be like:
+- for the SME system
+![celestial_positions](https://github.com/Gilt0/taiyoukei/assets/82427864/0c246f7d-5149-4cf7-868a-c58af28d1d3f)
+- for the ME system
+![relative_positions_M_to_E](https://github.com/Gilt0/taiyoukei/assets/82427864/1f6771ff-80cd-4684-b781-5946e0e9a42f)
