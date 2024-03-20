@@ -204,7 +204,7 @@ func (c *celestialConnection) run() error {
 		log.Printf("Received broadcast update %v\n", broadcast)
 
 		// Increment values
-		c.udpateData(broadcast, 0.000001)
+		c.udpateData(broadcast, 0.00001)
 
 		// Send updated values
 		err = c.sendUpdate()

@@ -22,3 +22,6 @@
 .vscode/
 .idea/
 *.swp
+
+# prject specifics
+data/
