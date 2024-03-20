@@ -1,5 +1,5 @@
 # taiyoukei
-Planetary system with gRPC.
+Planetary system with gRPC. [Please have a look at my blog for more on this project.](https://medium.com/p/32ee1bb12e45/edit)
 
 
 From the root, in that order
